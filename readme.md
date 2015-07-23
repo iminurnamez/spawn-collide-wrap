@@ -1,6 +1,6 @@
 # Spawn, Collide, Wrap   
 This is a challenge designed for [/r/pygame](https://www.reddit.com/r/pygame/)  
-[Link to challenge thread.](https://www.reddit.com/r/pygame/not_posted_yet)
+[Link to challenge thread.](https://www.reddit.com/r/pygame/comments/3eddbp/challenge_spawn_collide_wrap/)
 
 As per request, this challenge uses essentially the same base code as the previous challenge.  This challenge continues from the completed state of the previous challenge (using dirty sprites).  
 
@@ -8,9 +8,9 @@ As per request, this challenge uses essentially the same base code as the previo
 A group of obstacles have been added to our map.  
 Please implement the following features:
 * Sprites should not spawn inside walls.
-* All sprites should correctly collide with all walls.  NPCs should consider changing direction if a wall collision occurs.
+* All sprites should correctly collide with all walls.  NPCs should consider immediately changing direction if a wall collision occurs.
 * Instead of clamping sprites to the screen, sprites that exit the screen should wrap to the other side.
-* All sprites should use a collision box smaller than their image rect.  This collision box should be the "footprint" of the sprite, allowing the head of sprites to slightly overlap obstacles.
+* The player and NPCs should use a collision box smaller than their image rect.  This collision box should be the "footprint" of the sprite, allowing the head of sprites to slightly overlap obstacles.
 
 
 ### Base code:  
