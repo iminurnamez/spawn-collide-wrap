@@ -5,7 +5,7 @@ import tools
 
 # Useful constants.
 CAPTION = "Spawn, Collide, Wrap"
-SCREEN_WIDTH, SCREEN_HEIGHT = SCREEN_SIZE = (512, 512)
+SCREEN_WIDTH, SCREEN_HEIGHT = SCREEN_SIZE = (512, 512) #(764, 764)
 TILE_SIZE = 32 # Assume tiles are square.
 BACKGROUND_COLOR = pg.Color("darkgreen")
 
@@ -36,3 +36,8 @@ pg.display.set_mode(SCREEN_SIZE)
 GFX = {}
 GFX = tools.load_all_gfx("resources")
 GFX["characters"] = tools.load_all_gfx(os.path.join("resources", "rpgsprites"))
+bubbles = tools.split_sheet(GFX["bubblesheet"], (32, 56), 8, 1)
+for i, bubble in enumerate(bubbles[0]):
+    GFX["bubble{}".format(i)] = bubble
+
+SFX = tools.load_all_sounds(os.path.join("resources", "sounds"))

@@ -24,6 +24,18 @@ def load_all_gfx(directory, colorkey=None, accept=(".png",".jpg",".bmp")):
     return graphics
 
 
+def load_all_sounds(directory, accept=(".mp3",".wav",".ogg")):
+    """
+    Load all sounds with extensions in the accept argument as mixer.Sound objects.
+    """
+    sounds = {}
+    for sound in os.listdir(directory):
+        name,ext = os.path.splitext(sound)
+        if ext.lower() in accept:
+            sfx = pg.mixer.Sound(os.path.join(directory, sound))
+            sounds[name]=sfx
+    return sounds
+    
 def split_sheet(sheet, size, columns, rows):
     """
     Divide a loaded sprite sheet into subsurfaces.

@@ -1,4 +1,3 @@
-from math import sin, cos, radians
 import random
 import itertools
 import pygame as pg
@@ -14,7 +13,24 @@ def footprint_collide(left, right):
     """
     return left.footprint.colliderect(right.footprint)
 
-  
+def make_conversation(num_frames=20):
+    """
+    Return two list of image numbers to make conversation bubbles.
+    When one side is "talking", the other shows a blank image.
+    """    
+    img_nums = range(1, 8)
+    chat1 = []
+    chat2 = []
+    toggle = 0
+    while len(chat1) < num_frames:
+        talker, listener = (chat1, chat2) if not toggle % 2 else (chat2, chat1)
+        for i in range(random.randint(2, 5)):
+            talker.append(random.choice(img_nums))
+            listener.append(0)
+        toggle += 1
+    return chat1, chat2
+    
+
 SPRITE_SIZE = (32, 36)
 
 
@@ -38,7 +54,10 @@ class RPGSprite(pg.sprite.DirtySprite):
         self.footprint = pg.Rect((0,0), footprint_size)
         self.footprint.midbottom = self.rect.midbottom
         self.dirty = 1
-
+        
+        self.chatting = False
+        
+        
     def get_frames(self, character):
         """Get a list of all frames."""
         sheet = prepare.GFX["characters"][character]
@@ -151,19 +170,19 @@ class RPGSprite(pg.sprite.DirtySprite):
         
     def update(self, now, screen_rect, all_sprites, wrapped_sprites):
         """Update image and position of sprite."""
+            
         self.adjust_images(now)
         self.wrap_move(screen_rect)
         if self.rect.clamp(screen_rect) != self.rect:
             self.screen_wrap(screen_rect, all_sprites, wrapped_sprites)
-            self.dirty = 1
-        
-        if self.direction_stack:
+            self.dirty = 1            
+        if self.direction_stack and not self.chatting:
             direction_vector = prepare.DIRECT_DICT[self.direction]
             self.rect.x += self.speed*direction_vector[0]
             self.rect.y += self.speed*direction_vector[1]
             self.dirty = 1
         self.footprint.midbottom = self.rect.midbottom
-        
+            
     def draw(self, surface):
         """Draw sprite to surface (not used if using group draw functions)."""
         return surface.blit(self.image, self.rect)
@@ -173,7 +192,10 @@ class Player(RPGSprite):
     """This class will represent the user controlled character."""
     def __init__(self, pos, speed, footprint_size, name="warrior_m",  facing="DOWN", *groups):
         super(Player, self).__init__(pos, speed, footprint_size, name, facing, *groups)
-
+        self.grunts = [prepare.SFX["gruntsound{}".format(x)] for x in (1,)]
+        self.grunt_cooldown_time = 600
+        self.grunt_cooldown = 0
+        
     def get_event(self, event):
         """Handle events pertaining to player control."""
         if event.type == pg.KEYDOWN:
@@ -184,7 +206,7 @@ class Player(RPGSprite):
     def update(self, now, screen_rect, all_sprites, wrapped_sprites):
         """Call base classes update method and clamp player to screen."""
         super(Player, self).update(now, screen_rect, all_sprites, wrapped_sprites)
-    
+        
     def collide_with_walls(self, walls):
         """
         Bounce off the first wall in walls (a list of allwalls that the sprite collides with).
@@ -192,7 +214,11 @@ class Player(RPGSprite):
         "bouncing" multiple times.
         """        
         self.bounce(walls[0].footprint, self.direction)
-
+        now = pg.time.get_ticks()
+        if now - self.grunt_cooldown > self.grunt_cooldown_time:
+            random.choice(self.grunts).play()
+            self.grunt_cooldown = now
+            
     def add_direction(self, key):
         """Remove direction from stack if corresponding key is released."""
         if key in prepare.CONTROLS:
@@ -212,16 +238,26 @@ class AISprite(RPGSprite):
         self.wait_delay = random.randint(*self.wait_range)
         self.wait_time = 0.0
         self.change_direction()
-
+        self.chat_cooldown_range = (5000, 10000)
+        self.chat_cooldown_time = random.randint(*self.chat_cooldown_range)
+        self.chat_duration = 5000
+        self.chat_timer = 0
+        
+        self.bubble = None
+        
     def update(self, now, screen_rect, all_sprites, wrapped_sprites):
         """
         Choose a new direction if wait_time has expired or the sprite
         attempts to leave the screen.
         """
-        if now-self.wait_time > self.wait_delay:
+        if now-self.wait_time > self.wait_delay and not self.chatting:
             self.change_direction(now)
+        if now - self.chat_timer > self.chat_duration:
+            self.chatting = False
+            if self.bubble:
+                self.bubble.kill()
         super(AISprite, self).update(now, screen_rect, all_sprites, wrapped_sprites)
-        
+                        
     def collide_with_walls(self, walls):
         """
         Bounce off the first wall in walls (a list of allwalls that the sprite collides with)
@@ -229,6 +265,33 @@ class AISprite(RPGSprite):
         """
         self.bounce(walls[0].footprint, self.direction)
         self.change_direction(restricted=self.direction)
+        
+    def collide_with_npcs(self, npcs, all_sprites):
+        now = pg.time.get_ticks()
+        for npc in npcs:
+            if npc is not self:
+                if (now - self.chat_timer > self.chat_cooldown_time and 
+                    now - npc.chat_timer > npc.chat_cooldown_time):
+                    if self.rect.centerx < npc.rect.centerx:
+                        self.add_direction("RIGHT")
+                        npc.add_direction("LEFT")
+                    else:
+                        self.add_direction("LEFT")
+                        npc.add_direction("RIGHT")
+                    self.wait_time = now
+                    npc.wait_time = now
+                    self.wait_dealy = self.chat_duration
+                    npc.wait_dealy = npc.chat_duration
+                    self.chat_timer = now
+                    npc.chat_timer = now
+                    self.chatting = True
+                    npc.chatting = True
+                    chat1, chat2 = make_conversation()
+                    self.bubble = ChatBubble(self.rect.midbottom, chat1, self.chat_duration, all_sprites)
+                    npc.bubble = ChatBubble(npc.rect.midbottom, chat2, npc.chat_duration, all_sprites)
+                    self.chat_cooldown_time = random.randint(*self.chat_cooldown_range) + self.chat_duration
+                    npc.chat_cooldown_time = random.randint(*npc.chat_cooldown_range) + npc.chat_duration
+                    break
         
     def change_direction(self, now=0, restricted=None):
         """
@@ -247,13 +310,30 @@ class AISprite(RPGSprite):
             super(AISprite, self).add_direction(direction)
         
         self.wait_delay = random.randint(*self.wait_range)
-        self.wait_time = now
-
+        self.wait_time = now    
+            
+    
+class ChatBubble(pg.sprite.DirtySprite):    
+    def __init__(self, midbottom, img_nums, chat_duration, *groups):
+        super(ChatBubble, self).__init__(*groups)
+        images = [prepare.GFX["bubble{}".format(x)] for x in img_nums]
+        self.images = itertools.cycle(images)
+        self.frame_duration = 300
+        self.frame_time = pg.time.get_ticks()
+        self.image = next(self.images)
+        self.rect = self.image.get_rect(midbottom=midbottom)
+        
+    def update(self, now, screen_rect, all_sprites, wrapped_sprites):
+        if now - self.frame_time > self.frame_duration:
+            self.frame_time = now
+            self.image = next(self.images)
+            self.dirty = 1
+    
 
 class Obstacle(pg.sprite.DirtySprite):
-    def __init__(self, pos, footprint_size, *groups):
+    def __init__(self, pos, footprint_size, image_name, *groups):
         super(Obstacle, self).__init__(*groups)
-        self.image = prepare.GFX["stone"]
+        self.image = prepare.GFX[image_name]
         self.rect = self.image.get_rect(topleft=pos)
         self.footprint = pg.Rect((0,0), footprint_size)
         self.footprint.midbottom = self.rect.midbottom
